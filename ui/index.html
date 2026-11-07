@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Freeroam UI</title>
+<style>
+  :root {
+    --bg: rgba(14, 16, 24, 0.88);
+    --panel: rgba(24, 27, 38, 0.95);
+    --line: rgba(255, 255, 255, 0.08);
+    --text: #e8ebf3;
+    --muted: #8a92a8;
+    --accent: #ff7a1a;
+    --accent2: #ffb347;
+    --ok: #7ce38b;
+    --err: #ff6b6b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
+  body { font: 14px/1.4 "Segoe UI", Tahoma, sans-serif; color: var(--text); user-select: none; }
+
+  /* ---------- HUD (top right) ---------- */
+  #hud { position: absolute; top: 18px; right: 22px; text-align: right; text-shadow: 0 2px 4px #000; }
+  #hud .money { font-size: 26px; font-weight: 700; color: var(--ok); letter-spacing: .5px; }
+  #hud .meta { font-size: 12px; color: #cfd5e4; margin-top: 2px; }
+  #hud .brand { font-size: 11px; font-weight: 700; color: var(--accent); letter-spacing: 2px; text-transform: uppercase; }
+
+  /* ---------- Speedometer (bottom right) ---------- */
+  #speedo { position: absolute; right: 30px; bottom: 40px; width: 210px; padding: 14px 18px;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 14px; display: none; }
+  #speedo .speed { font-size: 48px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+  #speedo .unit { font-size: 13px; color: var(--muted); margin-left: 4px; }
+  #speedo .name { font-size: 12px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
+  #speedo .bar { height: 5px; background: var(--line); border-radius: 3px; margin-top: 10px; overflow: hidden; }
+  #speedo .bar > i { display: block; height: 100%; width: 100%; background: var(--ok); transition: width .2s, background .2s; }
+
+  /* ---------- Toasts ---------- */
+  #toasts { position: absolute; left: 50%; top: 70px; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .toast { background: var(--bg); border-left: 3px solid var(--accent); padding: 9px 16px; border-radius: 8px;
+    animation: tin .2s ease-out; transition: opacity .3s; }
+  @keyframes tin { from { opacity: 0; transform: translateY(-8px); } }
+
+  /* ---------- Menu ---------- */
+  #menu { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.35); }
+  #menu.open { display: flex; }
+  .win { width: min(880px, 92vw); height: min(560px, 86vh); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+  .win header { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .win header h1 { font-size: 16px; margin-right: auto; }
+  .win header h1 span { color: var(--accent); }
+  .tab { background: none; border: 0; color: var(--muted); font: inherit; font-weight: 600; padding: 7px 14px; border-radius: 8px; cursor: pointer; }
+  .tab.active, .tab:hover { color: var(--text); background: rgba(255,255,255,.06); }
+  .close { background: none; border: 0; color: var(--muted); font-size: 20px; cursor: pointer; padding: 0 6px; margin-left: 6px; }
+  .close:hover { color: var(--err); }
+  .tools { display: flex; gap: 8px; padding: 12px 18px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .tools input { flex: 1; min-width: 200px; background: rgba(255,255,255,.05); border: 1px solid var(--line); color: var(--text);
+    font: inherit; padding: 8px 12px; border-radius: 8px; outline: none; }
+  .tools input:focus { border-color: var(--accent); }
+  .chip { background: rgba(255,255,255,.05); border: 1px solid var(--line); color: var(--muted); font: inherit; font-size: 12px;
+    padding: 6px 12px; border-radius: 99px; cursor: pointer; }
+  .chip.active { color: #111; background: var(--accent); border-color: var(--accent); }
+  .grid { flex: 1; overflow-y: auto; padding: 14px 18px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px; align-content: start; }
+  .grid::-webkit-scrollbar { width: 8px; } .grid::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+  .card { background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 10px; padding: 12px; cursor: pointer;
+    transition: border-color .15s, transform .15s; }
+  .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .card b { display: block; font-size: 14px; }
+  .card small { color: var(--muted); font-size: 11px; }
+  .hint { padding: 10px 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+  kbd { background: rgba(255,255,255,.1); border-radius: 4px; padding: 1px 6px; font: inherit; color: var(--text); }
+</style>
+</head>
+<body>
+  <div id="hud">
+    <div class="brand">Freeroam</div>
+    <div class="money" id="money">$0</div>
+    <div class="meta"><span id="pname">-</span> · ID <span id="pid">-</span> · <span id="online">0</span> online</div>
+  </div>
+
+  <div id="speedo">
+    <div><span class="speed" id="speed">0</span><span class="unit">km/h</span></div>
+    <div class="name" id="vname">-</div>
+    <div class="bar"><i id="vhp"></i></div>
+  </div>
+
+  <div id="toasts"></div>
+
+  <div id="menu">
+    <div class="win">
+      <header>
+        <h1>Free<span>roam</span></h1>
+        <button class="tab active" data-tab="vehicles">Vehicles</button>
+        <button class="tab" data-tab="teleports">Teleports</button>
+        <button class="close" id="close" title="Close">×</button>
+      </header>
+      <div class="tools" id="tools"></div>
+      <div class="grid" id="grid"></div>
+      <div class="hint"><kbd>Y</kbd> or <kbd>Esc</kbd> to close · <kbd>/help</kbd> for commands</div>
+    </div>
+  </div>
+
+<script>
+// ---------------- Data ----------------
+// Keep TELEPORTS order in sync with gTeleports in freeroam.pwn
+const TELEPORTS = [
+  ["LS Airport", "Los Santos"], ["SF Airport", "San Fierro"], ["LV Airport", "Las Venturas"],
+  ["Mount Chiliad", "Countryside"], ["Grove Street", "Los Santos"], ["LV Strip", "Las Venturas"],
+  ["Santa Maria Beach", "Los Santos"], ["Vinewood Sign", "Los Santos"], ["Aircraft Graveyard", "Desert"],
+  ["Sherman Dam", "Desert"], ["Big Ear", "Desert"], ["SF Downtown", "San Fierro"]
+];
+
+const VEHICLES = {
+  "Sports":   [411, 541, 451, 415, 429, 506, 477, 560, 562, 565, 559, 603, 402, 480, 494, 502, 503],
+  "Bikes":    [522, 521, 461, 468, 581, 463, 586, 471, 481, 510, 509, 462],
+  "Off-road": [495, 444, 556, 557, 568, 424, 400, 489, 579, 470, 500],
+  "Air":      [520, 425, 487, 497, 469, 513, 476, 511, 593, 553, 519, 577, 592, 460, 447],
+  "Boats":    [452, 446, 493, 473, 454, 484, 430, 453, 472, 595, 539],
+  "Lowriders":[536, 575, 534, 567, 535, 576, 412, 566]
+};
+const NAMES = {400:"Landstalker",402:"Buffalo",411:"Infernus",412:"Voodoo",415:"Cheetah",424:"BF Injection",425:"Hunter",429:"Banshee",
+430:"Predator",444:"Monster",446:"Squalo",447:"Seasparrow",451:"Turismo",452:"Speeder",453:"Reefer",454:"Tropic",460:"Skimmer",
+461:"PCJ-600",462:"Faggio",463:"Freeway",468:"Sanchez",469:"Sparrow",470:"Patriot",471:"Quad",472:"Coastguard",473:"Dinghy",476:"Rustler",
+477:"ZR-350",480:"Comet",481:"BMX",484:"Marquis",487:"Maverick",489:"Rancher",493:"Jetmax",494:"Hotring",495:"Sandking",497:"Police Maverick",
+500:"Mesa",502:"Hotring Racer A",503:"Hotring Racer B",506:"Super GT",509:"Bike",510:"Mountain Bike",511:"Beagle",513:"Stuntplane",
+519:"Shamal",520:"Hydra",521:"FCR-900",522:"NRG-500",534:"Remington",535:"Slamvan",536:"Blade",539:"Vortex",541:"Bullet",553:"Nevada",
+556:"Monster A",557:"Monster B",559:"Jester",560:"Sultan",562:"Elegy",565:"Flash",566:"Tahoma",567:"Savanna",568:"Bandito",
+575:"Broadway",576:"Tornado",577:"AT-400",579:"Huntley",581:"BF-400",586:"Wayfarer",592:"Andromada",593:"Dodo",595:"Launch",603:"Phoenix"};
+
+// ---------------- Bridge (works in a normal browser too, for testing) ----------------
+const bridge = window.cef || {
+  on: (e, cb) => (window.__h = window.__h || {}, (window.__h[e] = cb)),
+  emit: (...a) => console.log("[emit]", ...a),
+  set_focus: () => {}
+};
+const $ = id => document.getElementById(id);
+
+// ---------------- HUD ----------------
+bridge.on("hud:init", (name, id) => { $("pname").textContent = name; $("pid").textContent = id; });
+bridge.on("hud", (money, online) => {
+  $("money").textContent = (money < 0 ? "-$" : "$") + Math.abs(money).toLocaleString("en-US");
+  $("online").textContent = online;
+});
+
+// ---------------- Speedometer ----------------
+bridge.on("speedo", (speed, hp, name) => {
+  $("speedo").style.display = "block";
+  $("speed").textContent = speed;
+  $("vname").textContent = name;
+  const pct = Math.max(0, Math.min(100, (hp - 250) / 7.5)); // 250 = burns, 1000 = full
+  const bar = $("vhp");
+  bar.style.width = pct + "%";
+  bar.style.background = pct > 50 ? "var(--ok)" : pct > 20 ? "var(--accent2)" : "var(--err)";
+});
+bridge.on("speedo:hide", () => { $("speedo").style.display = "none"; });
+
+// ---------------- Toasts ----------------
+bridge.on("notify", text => {
+  const t = document.createElement("div");
+  t.className = "toast"; t.textContent = text;
+  $("toasts").appendChild(t);
+  setTimeout(() => { t.style.opacity = 0; setTimeout(() => t.remove(), 300); }, 3000);
+  while ($("toasts").children.length > 4) $("toasts").firstChild.remove();
+});
+
+// ---------------- Menu ----------------
+let tab = "vehicles", category = "Sports", query = "";
+
+function render() {
+  document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  const tools = $("tools"), grid = $("grid");
+  tools.innerHTML = ""; grid.innerHTML = "";
+
+  const search = document.createElement("input");
+  search.placeholder = tab === "vehicles" ? "Search vehicles or enter model ID…" : "Search teleports…";
+  search.value = query;
+  search.oninput = () => { query = search.value; renderGrid(); };
+  tools.appendChild(search);
+
+  if (tab === "vehicles") {
+    Object.keys(VEHICLES).forEach(c => {
+      const b = document.createElement("button");
+      b.className = "chip" + (c === category && !query ? " active" : "");
+      b.textContent = c;
+      b.onclick = () => { category = c; query = ""; render(); };
+      tools.appendChild(b);
+    });
+  }
+  renderGrid();
+  setTimeout(() => search.focus(), 0);
+}
+
+function card(title, sub, onClick) {
+  const d = document.createElement("div");
+  d.className = "card";
+  d.innerHTML = "<b></b><small></small>";
+  d.querySelector("b").textContent = title;
+  d.querySelector("small").textContent = sub;
+  d.onclick = onClick;
+  return d;
+}
+
+function renderGrid() {
+  const grid = $("grid"); grid.innerHTML = "";
+  const q = query.trim().toLowerCase();
+  if (tab === "vehicles") {
+    let list;
+    if (/^\d{3}$/.test(q) && +q >= 400 && +q <= 611) list = [+q];
+    else if (q) list = Object.keys(NAMES).map(Number).filter(m => NAMES[m].toLowerCase().includes(q));
+    else list = VEHICLES[category];
+    list.forEach(m => grid.appendChild(card(NAMES[m] || ("Model " + m), "ID " + m, () => bridge.emit("vehicle:spawn", m))));
+  } else {
+    TELEPORTS.forEach(([name, area], i) => {
+      if (q && !name.toLowerCase().includes(q)) return;
+      grid.appendChild(card(name, area, () => bridge.emit("tp:go", i)));
+    });
+  }
+}
+
+function openMenu(t) { tab = t || "vehicles"; query = ""; $("menu").classList.add("open"); render(); }
+function closeMenu(notify) { $("menu").classList.remove("open"); if (notify) bridge.emit("menu:close"); }
+
+bridge.on("menu:open", t => openMenu(t));
+bridge.on("menu:close", () => closeMenu(false));
+document.querySelectorAll(".tab").forEach(b => b.onclick = () => { tab = b.dataset.tab; query = ""; render(); });
+$("close").onclick = () => closeMenu(true);
+document.addEventListener("keydown", e => {
+  if (!$("menu").classList.contains("open")) return;
+  if (e.key === "Escape" || ((e.key === "y" || e.key === "Y") && document.activeElement.tagName !== "INPUT")) closeMenu(true);
+});
+
+// Tell the server the page is loaded and listening
+bridge.emit("ui:ready");
+</script>
+</body>
+</html>

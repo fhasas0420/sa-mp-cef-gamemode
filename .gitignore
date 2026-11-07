@@ -1,0 +1,10 @@
+# open.mp runtime data
+omp-server/*.log
+omp-server/log.txt
+omp-server/bans.json
+omp-server/scriptfiles/*
+
+# build / runtime output
+client-files/
+launcher-releases/
+update-server/*.log
